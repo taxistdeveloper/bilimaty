@@ -26,7 +26,7 @@ $query = http_build_query(['group' => $groupId, 'semester' => $semesterId]);
         'subtitle' => __('reports.' . $kind . '_hint'),
         'back' => '/reports',
         'actions' => $groupId !== 0
-            ? '<a href="' . e(url('/reports/' . $kind . '?' . $query . '&format=print')) . '" target="_blank" rel="noopener" class="btn btn-outline-secondary"><i class="bi bi-printer me-1" aria-hidden="true"></i>' . e(__('workload.print')) . '</a>'
+            ? '<a href="' . e(url('/reports/' . $kind . '?' . $query . '&format=print')) . '" target="_blank" rel="noopener" class="btn btn-outline-secondary"><i class="bi bi-printer me-1" aria-hidden="true"></i>' . e($kind === 'gradesheet' ? __('o130.print_order') : __('workload.print')) . '</a>'
               . '<a href="' . e(url('/reports/' . $kind . '?' . $query . '&format=csv')) . '" class="btn btn-outline-secondary"><i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>Excel (CSV)</a>'
             : '',
     ]) ?>

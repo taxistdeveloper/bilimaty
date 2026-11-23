@@ -2,6 +2,7 @@
 /** @var App\Core\View $this */
 $cards = [
     ['reports.performance', 'reports.performance_hint', 'bi-mortarboard', '/reports/performance', can('reports.view')],
+    ['reports.gradesheet', 'reports.gradesheet_hint', 'bi-clipboard-data', '/reports/gradesheet', can('reports.view')],
     ['reports.attendance', 'reports.attendance_hint', 'bi-calendar-check', '/reports/attendance', can('reports.view')],
     ['workload.reports', 'reports.workload_hint', 'bi-hourglass-split', '/workload/reports', can('workload.view') || can('workload.manage')],
     ['surveys.title', 'reports.surveys_hint', 'bi-ui-checks', '/surveys', can('surveys.results') || can('surveys.manage')],

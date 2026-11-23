@@ -44,6 +44,12 @@ final class ReportController extends Controller
         return $this->report($request, 'attendance');
     }
 
+    /** Summary grade sheet: five-point marks, absolute performance, quality and average by subject and group. */
+    public function gradesheet(Request $request): Response
+    {
+        return $this->report($request, 'gradesheet');
+    }
+
     private function report(Request $request, string $kind): Response
     {
         $groups = $this->reports->groups();
@@ -57,12 +63,30 @@ final class ReportController extends Controller
             throw new HttpException(403);
         }
         $groupId = $groupId !== 0 ? $groupId : (int) (array_key_first($groups) ?? 0);
-        $data = $groupId !== 0 && $semesterId !== 0 ? $this->reports->build($groupId, $semesterId) : ['subjects' => [], 'students' => []];
+        $empty = ['subjects' => [], 'students' => []];
+        $data = $groupId !== 0 && $semesterId !== 0
+            ? ($kind === 'gradesheet' ? $this->reports->gradeSheet($groupId, $semesterId) : $this->reports->build($groupId, $semesterId))
+            : $empty;
         $title = __('reports.' . $kind) . ($groupId !== 0 ? ' · ' . $groups[$groupId] : '');
         $format = (string) $request->query('format', '');
 
+        if ($format === 'csv' && $kind === 'gradesheet') {
+            return Csv::download($this->gradeSheetRows($data, $groups[$groupId] ?? '', $semesters[$semesterId] ?? ''), $kind . '-' . ($groups[$groupId] ?? 'group') . '-' . date('Ymd') . '.csv');
+        }
+
         if ($format === 'csv') {
             return Csv::download($this->rows($kind, $data, $groups[$groupId] ?? '', $semesters[$semesterId] ?? ''), $kind . '-' . ($groups[$groupId] ?? 'group') . '-' . date('Ymd') . '.csv');
+        }
+
+        if ($format === 'print' && $kind === 'gradesheet') {
+            // Form 5.5 of Order No. 130 in the five-point system, with the group totals under it.
+            $order = new Order130();
+            $empty55 = ['group' => [], 'year' => '', 'subjects' => [], 'students' => []];
+
+            return $this->view('reports/gradesheet_o130', [
+                'title' => __('reports.gradesheet') . ($groupId !== 0 ? ' · ' . $groups[$groupId] : ''),
+                'form' => $order->withTotals($groupId !== 0 && $semesterId !== 0 ? $order->yearResults($groupId, $semesterId) : $empty55),
+            ], 'layouts/print');
         }
 
         if ($format === 'print') {
@@ -112,6 +136,50 @@ final class ReportController extends Controller
                 array_push($row, $st['absent'], $st['excused'], $pct === null ? '' : $pct . '%');
             }
             $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    /** @return list<list<scalar|null>> */
+    private function gradeSheetRows(array $data, string $group, string $semester): array
+    {
+        $pct = static fn (?float $v): string => $v === null ? '' : $v . '%';
+        $num = static fn (?float $v): string => $v === null ? '' : (string) $v;
+        $rows = [[__('reports.gradesheet'), $group, $semester]];
+        $header = ['№', __('journal.student')];
+        foreach ($data['subjects'] as $s) {
+            $header[] = trim($s['code'] . ' ' . $s['name']);
+        }
+        $header[] = __('reports.gs_average');
+        $rows[] = $header;
+        foreach ($data['students'] as $i => $st) {
+            $row = [$i + 1, $st['name']];
+            foreach ($data['subjects'] as $s) {
+                $g = $st['cells'][$s['id']]['grade'] ?? null;
+                $row[] = $g === null ? '' : $g['mark'] . ($g['letter'] !== null ? ' (' . $g['letter'] . ')' : '');
+            }
+            $row[] = $num($st['stats']['average']);
+            $rows[] = $row;
+        }
+        foreach (['absolute' => $pct, 'quality' => $pct, 'average' => $num] as $key => $fmt) {
+            $row = ['', __('reports.gs_' . $key)];
+            foreach ($data['subjects'] as $s) {
+                $row[] = $fmt($data['subject_stats'][$s['id']][$key] ?? null);
+            }
+            $row[] = $fmt($data['summary'][$key] ?? null);
+            $rows[] = $row;
+        }
+        if (isset($data['summary'])) {
+            $rows[] = [];
+            $rows[] = [__('reports.gs_group_total')];
+            $rows[] = [__('reports.gs_students'), $data['summary']['students']];
+            foreach ($data['summary']['categories'] as $key => $names) {
+                $rows[] = [__('reports.gs_cat.' . $key), count($names), implode(', ', $names)];
+            }
+            $rows[] = [__('reports.gs_absolute'), $pct($data['summary']['absolute'])];
+            $rows[] = [__('reports.gs_quality'), $pct($data['summary']['quality'])];
+            $rows[] = [__('reports.gs_average'), $num($data['summary']['average'])];
         }
 
         return $rows;

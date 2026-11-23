@@ -113,6 +113,55 @@ final class Order130
     }
 
     /**
+     * Form 5.5 converted to the five-point system (Типовые правила, приказ МОН РК № 125) with the
+     * group totals the college adds under it: absolute performance, quality and average mark by
+     * subject, and excellent / good / satisfactory / failing students for the year.
+     * The mark of a subject for the year is its «Итоговая оценка», otherwise the latest semester mark.
+     *
+     * @param array<string, mixed> $form result of yearResults()
+     * @return array<string, mixed> the form with marks[subject id][s1|s2|exam|final] in every student,
+     *   subject_stats[subject id] and summary (see GradeScale::summary())
+     */
+    public function withTotals(array $form): array
+    {
+        $subjectMarks = array_fill_keys(array_column($form['subjects'], 'id'), []);
+        $marksByStudent = [];
+        foreach ($form['students'] as $i => &$student) {
+            $marks = [];
+            foreach ($student['cells'] as $subjectId => $cell) {
+                $converted = [];
+                foreach (['s1', 's2', 'exam', 'final'] as $key) {
+                    $value = $cell[$key] ?? null;
+                    $converted[$key] = is_numeric($value)
+                        ? GradeScale::grade($value, $cell['scheme'] ?? null, $key === 'final' ? ($cell['passed'] ?? null) : null)
+                        : null;
+                }
+                $credit = $cell['credit'] ?? null;
+                $converted['credit'] = is_numeric($credit) ? GradeScale::grade($credit, $cell['scheme'] ?? null) : null;
+                $student['marks'][$subjectId] = $converted;
+                $year = $converted['final'] ?? $converted['s2'] ?? $converted['s1'];
+                if ($year !== null) {
+                    $marks[] = $year['mark'];
+                    $subjectMarks[$subjectId][] = $year['mark'];
+                }
+            }
+            $student['average'] = GradeScale::stats($marks)['average'];
+            $marksByStudent[$i] = $marks;
+        }
+        unset($student);
+        $summary = GradeScale::summary($marksByStudent);
+        foreach ($summary['categories'] as $key => $indexes) {
+            $summary['categories'][$key] = array_map(static fn (string $i): string => $form['students'][(int) $i]['name'], $indexes);
+        }
+
+        return $form + [
+            'subject_stats' => array_map([GradeScale::class, 'stats'], $subjectMarks),
+            'summary' => $summary,
+            'scale' => GradeScale::scale(),
+        ];
+    }
+
+    /**
      * Form 5.5 "Итоги учебно-воспитательной работы" of a group for the academic year of the semester.
      *
      * @return array{
@@ -132,6 +181,10 @@ final class Order130
             $group['course'] = self::courseIn((int) $group['course'], (int) $year['id']);
         }
         $today = date('Y-m-d');
+        $schemes = [];
+        foreach (Database::fetchAll('SELECT id, grade_min, grade_max FROM grading_schemes') as $row) {
+            $schemes[(int) $row['id']] = ['min' => (float) $row['grade_min'], 'max' => (float) $row['grade_max']];
+        }
 
         $subjects = [];
         $students = [];
@@ -159,6 +212,9 @@ final class Order130
                     $exam = self::component($grid['components'], $r, 'exam');
                     $cell = $students[$sid]['cells'][$subjectId] ?? ['s1' => null, 's2' => null, 'rating' => null, 'credit' => null, 'exam' => null, 'final' => null];
                     $cell['s' . min(2, max(1, $number))] = $final;
+                    // Scale of the latest journal and its pass verdict: used to convert grades to five-point marks.
+                    $cell['scheme'] = $journal['grading_scheme_id'] !== null ? ($schemes[(int) $journal['grading_scheme_id']] ?? null) : null;
+                    $cell['passed'] = $r['passed'];
                     // Attestation of the semester in which the subject is examined (curriculum control form).
                     $cell['rating'] = self::admissionRating($grid['components'], $r) ?? $cell['rating'];
                     $form = $item['control_form'];

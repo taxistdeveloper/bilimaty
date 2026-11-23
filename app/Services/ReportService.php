@@ -77,7 +77,8 @@ final class ReportService
             $grid = $service->grid($journal);
             $held = array_values(array_filter($grid['lessons'], static fn (array $l): bool => $l['lesson_date'] <= $today));
             $subjects[] = ['id' => (int) $journal['id'], 'name' => localized(['name_ru' => $journal['subject_name_ru'], 'name_kk' => $journal['subject_name_kk']]),
-                'code' => $journal['subject_code'], 'status' => $journal['status'], 'lessons' => count($held)];
+                'code' => $journal['subject_code'], 'status' => $journal['status'], 'lessons' => count($held),
+                'scheme_id' => $journal['grading_scheme_id'] !== null ? (int) $journal['grading_scheme_id'] : null];
             foreach ($grid['students'] as $s) {
                 $sid = (int) $s['id'];
                 $students[$sid] ??= ['id' => $sid, 'name' => full_name($s, true), 'number' => $s['student_number'] ?? '', 'cells' => [], 'debts' => 0, 'absent' => 0, 'excused' => 0, 'lessons' => 0];
@@ -99,6 +100,64 @@ final class ReportService
         uasort($students, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
 
         return ['subjects' => $subjects, 'students' => array_values($students)];
+    }
+
+    /**
+     * Summary grade sheet of a group (сводная ведомость): every final converted to the traditional
+     * five-point mark and the letter of the point-rating scale, with absolute performance, quality
+     * and average mark per subject, per student and for the whole group.
+     *
+     *   absolute performance = graded without a «2» / graded × 100
+     *   quality              = graded «4» and «5» / graded × 100
+     *   average mark         = mean of five-point marks
+     *
+     * @return array<string, mixed>
+     */
+    public function gradeSheet(int $groupId, int $semesterId): array
+    {
+        $data = $this->build($groupId, $semesterId);
+        $schemeIds = array_values(array_unique(array_filter(array_column($data['subjects'], 'scheme_id'))));
+        $schemes = [];
+        if ($schemeIds !== []) {
+            foreach (Database::fetchAll('SELECT id, grade_min, grade_max FROM grading_schemes WHERE id IN (' . implode(',', array_fill(0, count($schemeIds), '?')) . ')', $schemeIds) as $row) {
+                $schemes[(int) $row['id']] = ['min' => (float) $row['grade_min'], 'max' => (float) $row['grade_max']];
+            }
+        }
+
+        $subjectStats = [];
+        foreach ($data['subjects'] as $subject) {
+            $subjectStats[$subject['id']] = [];
+        }
+        $marksByStudent = [];
+        foreach ($data['students'] as $i => &$student) {
+            $marks = [];
+            foreach ($data['subjects'] as $subject) {
+                $cell = $student['cells'][$subject['id']] ?? null;
+                if ($cell === null) {
+                    continue;
+                }
+                $grade = GradeScale::grade($cell['final'], $subject['scheme_id'] !== null ? ($schemes[$subject['scheme_id']] ?? null) : null, $cell['passed']);
+                $student['cells'][$subject['id']]['grade'] = $grade;
+                if ($grade !== null) {
+                    $marks[] = $grade['mark'];
+                    $subjectStats[$subject['id']][] = $grade['mark'];
+                }
+            }
+            $student['stats'] = GradeScale::stats($marks);
+            $student['category'] = GradeScale::category($marks);
+            $marksByStudent[$i] = $marks;
+        }
+        unset($student);
+        $summary = GradeScale::summary($marksByStudent);
+        foreach ($summary['categories'] as $key => $indexes) {
+            $summary['categories'][$key] = array_map(static fn (string $i): string => $data['students'][(int) $i]['name'], $indexes);
+        }
+
+        return $data + [
+            'subject_stats' => array_map([GradeScale::class, 'stats'], $subjectStats),
+            'summary' => $summary,
+            'scale' => GradeScale::scale(),
+        ];
     }
 
     /** Share of attended lessons, % (null when nothing was held). */
