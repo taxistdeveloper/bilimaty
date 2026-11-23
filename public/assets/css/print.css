@@ -1,0 +1,46 @@
+/* A4 print layout for documents saved as PDF from the browser. */
+@page { size: A4; margin: 15mm 14mm; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "DejaVu Sans", "Segoe UI", Arial, sans-serif; font-size: 11pt; color: #1e293b; background: #f1f5f9; }
+.sheet { width: 210mm; min-height: 297mm; margin: 16px auto; padding: 15mm 14mm; background: #fff; box-shadow: 0 2px 12px rgba(15, 23, 42, .12); }
+.doc-header { text-align: center; margin-bottom: 8mm; }
+.doc-org { font-size: 10pt; text-transform: uppercase; letter-spacing: .04em; color: #475569; }
+h1 { font-size: 16pt; margin: 2mm 0 1mm; }
+h2 { font-size: 12pt; margin: 7mm 0 2mm; color: #1d4ed8; }
+.doc-meta, .muted { color: #64748b; font-size: 9.5pt; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid #cbd5e1; padding: 2mm 2.5mm; text-align: left; vertical-align: top; }
+th { background: #f1f5f9; font-size: 9.5pt; }
+tr { break-inside: avoid; }
+.doc-footer { margin-top: 10mm; font-size: 8.5pt; color: #94a3b8; text-align: right; }
+.print-toolbar { position: sticky; top: 0; display: flex; gap: 12px; align-items: center; justify-content: center; padding: 10px; background: #0f172a; color: #cbd5e1; font-size: 13px; }
+.print-notice { max-width: 210mm; margin: 10px auto 0; padding: 10px 14px; border-radius: 6px; background: #fef3c7; color: #78350f; font-size: 13px; }
+.print-toolbar button { padding: 8px 16px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; font-weight: 600; cursor: pointer; }
+@media print {
+    body { background: #fff; }
+    .print-toolbar, .print-notice { display: none; }
+    .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+}
+
+/* Forms of Order No. 130 (MES RK, 06.04.2020): official blanks, black on white, landscape spreads. */
+.o130 { color: #000; font-family: "Times New Roman", "DejaVu Serif", serif; font-size: 10pt; }
+.o130 th, .o130 td { border: 1px solid #000; padding: .8mm 1mm; font-size: 8.5pt; text-align: center; vertical-align: middle; }
+.o130 th { background: none; font-weight: normal; }
+.o130 td.l, .o130 th.l { text-align: left; }
+.o130 .nw { white-space: nowrap; }
+.o130 .v { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; padding: 1mm .5mm; }
+.o130 .form-no { text-align: right; font-size: 9pt; margin-bottom: 1mm; }
+.o130 .form-title { text-align: center; font-weight: bold; text-transform: uppercase; font-size: 11pt; margin: 1mm 0 3mm; }
+.o130 .side { text-align: center; font-size: 9pt; margin-bottom: 1mm; }
+.o130 .fields { margin: 0 0 3mm; font-size: 10pt; }
+.o130 .fields span { border-bottom: 1px solid #000; padding: 0 2mm; }
+.o130 .sign { margin-top: 6mm; font-size: 10pt; }
+.o130 .basis { font-size: 8pt; color: #333; margin-top: 4mm; }
+.o130 .page { break-after: page; padding-bottom: 6mm; }
+.o130 .page:last-child { break-after: auto; }
+.o130 .cover { text-align: center; padding-top: 30mm; min-height: 150mm; }
+.o130 .cover .ministry { font-size: 12pt; text-transform: uppercase; }
+.o130 .cover h1 { font-size: 22pt; margin: 25mm 0 15mm; text-transform: uppercase; }
+.o130 .cover .line { font-size: 13pt; margin: 4mm auto; max-width: 170mm; text-align: left; }
+.o130 .cover .line span { display: inline-block; min-width: 110mm; border-bottom: 1px solid #000; padding: 0 2mm; }
+@media screen { .o130 .page { border-bottom: 1px dashed #94a3b8; margin-bottom: 8mm; } .o130 .page:last-child { border-bottom: 0; } }

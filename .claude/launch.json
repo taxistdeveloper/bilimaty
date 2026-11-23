@@ -1,0 +1,32 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bilimaty-local",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "php -S 127.0.0.1:8088 -t public public/index.php"
+      ],
+      "port": 8088
+    },
+    {
+      "name": "bilimaty-test-db",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "DB_PORT=3407 DB_PASSWORD= php -S 127.0.0.1:8090 -t public public/index.php"
+      ],
+      "port": 8090
+    },
+    {
+      "name": "bilimaty-saas-test",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "DB_PORT=3407 DB_PASSWORD= TENANCY=true PLATFORM_DB_DATABASE=dev_platform TENANT_DB_PREFIX=dev_t_ php -S 127.0.0.1:8092 -t public public/index.php"
+      ],
+      "port": 8092
+    }
+  ]
+}

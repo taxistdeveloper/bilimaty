@@ -1,0 +1,33 @@
+{
+    "name": "collegeos/collegeos",
+    "description": "BILIMATY — College Education Management System",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.3",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
+        "ext-mbstring": "*",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/"
+        },
+        "files": [
+            "app/Helpers/functions.php"
+        ]
+    },
+    "scripts": {
+        "migrate": "php cli.php migrate",
+        "seed": "php cli.php db:seed",
+        "lint": "find app config routes database public cli.php -name '*.php' -print0 | xargs -0 -n1 php -l",
+        "test": "php tests/run.php",
+        "test:all": "php tests/run.php --integration",
+        "check": ["php cli.php check", "php cli.php db:check"]
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

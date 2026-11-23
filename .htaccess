@@ -1,0 +1,13 @@
+# Used only when the web server's document root is the project folder
+# (e.g. XAMPP htdocs/collegeos). Everything is routed into public/,
+# so app/, config/, storage/, .env and vendor/ are never reachable.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+<FilesMatch "^\.|\.(env|log|sql|lock)$|^(cli|bootstrap)\.php$">
+    Require all denied
+</FilesMatch>

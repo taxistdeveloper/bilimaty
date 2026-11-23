@@ -1,0 +1,33 @@
+Options -Indexes -MultiViews
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Pass the Authorization header to PHP
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Existing files (assets) are served directly, everything else goes to index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Never serve dotfiles
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    # Asset URLs carry ?v=<modification time> (see asset()), so a changed file gets a new URL:
+    # browsers may keep the files for a year without asking again.
+    <FilesMatch "\.(css|js|woff2?|png|jpe?g|webp|svg|ico)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+        Header set X-Content-Type-Options "nosniff"
+    </FilesMatch>
+</IfModule>
+
+# Compress text responses (HTML pages, CSS, JS, JSON, SVG)
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/plain text/csv application/javascript application/json image/svg+xml
+</IfModule>
