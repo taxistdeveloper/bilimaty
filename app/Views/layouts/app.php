@@ -27,8 +27,10 @@
 <?= $this->partial('layouts/partials/toasts') ?>
 <?= $this->partial('layouts/partials/confirm-modal') ?>
 <?= $this->partial('layouts/partials/i18n') ?>
+<?= $this->partial('layouts/partials/assistant') ?>
 <script src="<?= e(asset('assets/vendor/bootstrap/bootstrap.bundle.min.js')) ?>"></script>
 <script src="<?= e(asset('assets/js/app.js')) ?>"></script>
+<script src="<?= e(asset('assets/js/assistant.js')) ?>"></script>
 <?= $this->section('scripts') ?>
 </body>
 </html>

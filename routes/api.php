@@ -24,6 +24,12 @@ $router->group(['middleware' => ['auth', 'password.fresh']], function (Router $r
     $router->get('/groups', [GroupController::class, 'apiIndex'], ['can:groups.view'], 'api.groups');
     $router->get('/groups/{id:\d+}/students', [GroupController::class, 'apiStudents'], ['can:groups.view'], 'api.groups.students');
 
+    // Personal assistant: answers about the user's own timetable, exams and grades.
+    $router->post('/assistant', [App\Controllers\Api\AssistantController::class, 'ask'], [], 'api.assistant');
+    $router->post('/assistant/listen', [App\Controllers\Api\AssistantController::class, 'listen'], [], 'api.assistant.listen');
+    $router->post('/assistant/speech', [App\Controllers\Api\AssistantController::class, 'speech'], [], 'api.assistant.speech');
+    $router->get('/assistant/speech/{key:[a-f0-9]{64}}', [App\Controllers\Api\AssistantController::class, 'audio']);
+
     // Timetable (see App\Controllers\Api\ScheduleController).
     $router->get('/schedule', [ScheduleController::class, 'index'], ['can:schedule.view'], 'api.schedule');
     $router->get('/schedule/{id:\d+}', [ScheduleController::class, 'show'], ['can:schedule.view']);

@@ -15,6 +15,8 @@ declare(strict_types=1);
  *   php cli.php db:check     Check the database structure (engine, charset, keys, indexes, migrations)
  *   php cli.php check        Check production readiness (PHP, extensions, folders, .env security)
  *   php cli.php hr:daily     Close accounts of employees whose dismissal date has come (run daily from cron)
+ *   php cli.php assistant:vosk   Turn on offline voice input: install Vosk and download the Russian model
+ *                                (vosk-model-small-ru-0.22, ~45 MB, Apache 2.0, from alphacephei.com)
  *
  * Several colleges (TENANCY=true in .env):
  *   php cli.php platform:install         Create the platform database and the first owner account
@@ -218,6 +220,65 @@ switch ($command) {
                 $out('   FAILED: ' . $e->getMessage());
             }
         }
+        break;
+
+    case 'assistant:vosk':
+        $dir = storage_path('private/vosk');
+        $python = $dir . '/venv/bin/python';
+        $run = static function (array $cmd) use ($out): void {
+            $out('$ ' . implode(' ', $cmd));
+            $p = proc_open($cmd, [1 => STDOUT, 2 => STDERR], $pipes);
+            if (!is_resource($p) || proc_close($p) !== 0) {
+                $out('FAILED');
+                exit(1);
+            }
+        };
+        if (!is_dir($dir) && !mkdir($dir, 0775, true)) {
+            $out("Cannot create {$dir}");
+            exit(1);
+        }
+        if (!is_executable($python)) {
+            $run([$options[0] ?? 'python3', '-m', 'venv', $dir . '/venv']);
+        }
+        $run([$python, '-m', 'pip', 'install', '-q', '--upgrade', 'vosk']);
+
+        $url = (string) config('assistant.vosk.download');
+        $model = $dir . '/' . basename($url, '.zip');
+        if (!is_dir($model)) {
+            $zip = $dir . '/model.zip';
+            $out("Downloading {$url} …");
+            $fh = fopen($zip, 'wb');
+            $curl = curl_init($url);
+            curl_setopt_array($curl, [CURLOPT_FILE => $fh, CURLOPT_FOLLOWLOCATION => true, CURLOPT_FAILONERROR => true, CURLOPT_CONNECTTIMEOUT => 20]);
+            if ((string) ini_get('curl.cainfo') === '' && (string) ini_get('openssl.cafile') === '') {
+                // PHP without its own CA bundle: use the system one (TLS verification stays on)
+                foreach (['/etc/ssl/cert.pem', '/etc/ssl/certs/ca-certificates.crt', '/etc/pki/tls/certs/ca-bundle.crt'] as $ca) {
+                    if (is_file($ca)) {
+                        curl_setopt($curl, CURLOPT_CAINFO, $ca);
+                        break;
+                    }
+                }
+            }
+            $ok = curl_exec($curl);
+            $error = curl_error($curl);
+            fclose($fh);
+            if ($ok !== true) {
+                @unlink($zip);
+                $out('Download failed: ' . $error);
+                exit(1);
+            }
+            $archive = new ZipArchive();
+            if ($archive->open($zip) !== true || !$archive->extractTo($dir)) {
+                $out('Cannot unpack ' . $zip);
+                exit(1);
+            }
+            $archive->close();
+            unlink($zip);
+        }
+        $out('');
+        $out('Voice input is ready. Add to .env:');
+        $out('VOSK_PYTHON=' . $python);
+        $out('VOSK_MODEL_RU=' . $model);
         break;
 
     case 'db:check':

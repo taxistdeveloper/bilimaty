@@ -104,7 +104,9 @@ final class ConsistencyTest extends TestCase
             'GET /owner-login']; // one-time token from the owner's panel (several colleges)
         $personal = ['POST /logout', 'GET /profile', 'PUT /profile', 'GET /profile/password', 'PUT /profile/password', 'GET /api/notifications', 'POST /api/notifications/read',
             // Demo "view as role": checked in DemoRoleSwitch (super admin, never in production).
-            'POST /demo/role', 'POST /demo/back'];
+            'POST /demo/role', 'POST /demo/back',
+            // Assistant answers only about the user's own data; each topic checks its permission in AssistantService.
+            'POST /api/assistant', 'POST /api/assistant/speech', 'POST /api/assistant/listen', 'GET /api/assistant/speech/{key:[a-f0-9]{64}}'];
         foreach (Application::instance()->routes() as $route) {
             $key = $route['method'] . ' ' . $route['uri'];
             if (!in_array('auth', $route['middleware'], true)) {

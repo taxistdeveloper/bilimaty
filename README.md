@@ -521,6 +521,59 @@ php cli.php user:password admin --college=<код>   # любая команда
 
 Пользователю MySQL нужно право `CREATE` на базы с префиксом колледжей. Текущую базу одного колледжа можно подключить в панели: «Новый колледж» → «Подключить существующую базу».
 
+## ИИ-ассистент и голос
+
+Кнопка ✨ в правом нижнем углу каждой страницы. Студент или преподаватель спрашивает голосом
+или текстом («какие пары завтра?», «какая следующая пара?», «расписание на неделю»,
+«когда экзамены?», «мои оценки»; по-русски и по-казахски) — ассистент показывает ответ
+и зачитывает его. Вопросы разбираются правилами (`App\Services\AssistantService`),
+внешние ИИ-сервисы не нужны. Голосовой ввод — Web Speech API браузера (Chrome, Edge, Safari; нужен HTTPS).
+
+### Голос ассистента
+
+По умолчанию ответы читает голос браузера (лучшие — в Edge «Natural» и Chrome «Google»).
+Чтобы у всех звучал одинаково живой голос, установите **Piper** — бесплатный открытый
+нейросинтез речи, работает на сервере без интернета:
+
+```bash
+python3 -m venv storage/private/piper/venv
+storage/private/piper/venv/bin/pip install piper-tts
+mkdir -p storage/private/piper/voices && cd storage/private/piper/voices
+# русский (женский голос Irina) и казахский (ISSAI)
+curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx
+curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx.json
+curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/main/kk/kk_KZ/issai/high/kk_KZ-issai-high.onnx
+curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/main/kk/kk_KZ/issai/high/kk_KZ-issai-high.onnx.json
+```
+
+и в `.env` (абсолютные пути):
+
+```
+PIPER_BIN=/path/to/college/storage/private/piper/venv/bin/piper
+PIPER_VOICE_RU=/path/to/college/storage/private/piper/voices/ru_RU-irina-medium.onnx
+PIPER_VOICE_KK=/path/to/college/storage/private/piper/voices/kk_KZ-issai-high.onnx
+PIPER_SPEAKER_KK=3   # Raya, женский; 1 — Iseke, мужской
+```
+
+Другие голоса: https://huggingface.co/rhasspy/piper-voices (мужские русские — `denis`, `dmitri`, `ruslan`).
+Озвученные ответы кешируются в `storage/cache/tts` на 7 дней. Если Piper не настроен или
+не ответил, ассистент автоматически читает голосом браузера.
+
+### Голосовой ввод офлайн (Vosk)
+
+По умолчанию речь распознаёт браузер (в Chrome звук уходит в Google, в Firefox распознавания нет).
+Чтобы распознавать на своём сервере без интернета, включите **Vosk** (Apache 2.0):
+
+```bash
+php cli.php assistant:vosk
+```
+
+Команда ставит пакет `vosk` в `storage/private/vosk/venv` и скачивает с alphacephei.com модель
+`vosk-model-small-ru-0.22` (~45 МБ), затем печатает строки `VOSK_PYTHON=` и `VOSK_MODEL_RU=` для `.env`.
+Браузер записывает микрофон (останавливается сам после паузы 1,2 с, максимум 15 с), сервер
+распознаёт запись скриптом `bin/vosk-transcribe.py`. Для казахского укажите модель в `VOSK_MODEL_KK`;
+пока её нет, на казахском интерфейсе работает распознавание браузера.
+
 ## Тестирование (этап 11)
 
 ```bash
