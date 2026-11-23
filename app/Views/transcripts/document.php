@@ -8,13 +8,13 @@ $h = $t['snapshot']['header'];
 $kk = locale() === 'kk';
 $college = $kk ? ($h['college_kk'] ?? '') : ($h['college_ru'] ?? '');
 ?>
-<style>.doc-grid { display: grid; grid-template-columns: 1fr 34mm; gap: 6mm; align-items: start; } .qr svg { width: 34mm; height: 34mm; } .meta td { border: 0; padding: 0.6mm 1mm; } .revoked { border: 2px solid #b91c1c; color: #b91c1c; padding: 3mm; text-align: center; font-weight: 700; margin-bottom: 4mm; } .muted-sm { font-size: 8pt; color: #64748b; word-break: break-all; }</style>
+<style>.doc-grid { display: grid; grid-template-columns: 1fr 34mm; gap: 6mm; align-items: start; } .qr svg { width: 34mm; height: 34mm; } .meta td { border: 0; padding: 0.6mm 1mm; } .revoked { border: 2px solid #b91c1c; color: #b91c1c; padding: 3mm; text-align: center; font-weight: 700; margin-bottom: 4mm; } .rk { width: 100%; border-collapse: collapse; font-size: 9.5pt; } .rk th, .rk td { border: 1px solid #334155; padding: 1.2mm 1.6mm; } .rk th { background: #f1f5f9; font-weight: 600; } .rk .c { text-align: center; } .rk tr.sem td { background: #f8fafc; font-weight: 700; } .rk tfoot td { background: #f8fafc; } .scale { margin-top: 5mm; break-inside: avoid; } .scale-title { font-weight: 700; font-size: 9pt; margin-bottom: 1.5mm; } .scale-table { font-size: 7.5pt; table-layout: fixed; } .scale-table th { width: 32mm; } .scale-table th { text-align: left; } .scale-table .sm { font-size: 7pt; hyphens: auto; overflow-wrap: anywhere; } .signs { margin-top: 12mm; display: grid; grid-template-columns: 1fr auto; row-gap: 8mm; column-gap: 6mm; align-items: end; break-inside: avoid; } .signs .line { border-bottom: 1px solid #334155; width: 60mm; } .muted-sm { font-size: 8pt; color: #64748b; word-break: break-all; }</style>
 <?php if ($t['status'] === 'revoked'): ?>
     <div class="revoked"><?= e(__('transcripts.revoked_banner', ['date' => format_date((string) $t['revoked_at'])])) ?><?= $t['revoke_reason'] ? ': ' . e($t['revoke_reason']) : '' ?></div>
 <?php endif; ?>
 <header class="doc-header">
     <?php if ($college !== ''): ?><div class="doc-org"><?= e($college) ?></div><?php endif; ?>
-    <h1><?= e(__('transcripts.document')) ?> № <?= e($t['number']) ?></h1>
+    <h1><?= e(mb_strtoupper(__('transcripts.form_title'))) ?> № <?= e($t['number']) ?></h1>
     <div class="doc-meta"><?= e(__('transcripts.issued_at')) ?>: <?= e(format_date($t['issued_at'])) ?></div>
 </header>
 <div class="doc-grid">
@@ -30,11 +30,95 @@ $college = $kk ? ($h['college_kk'] ?? '') : ($h['college_ru'] ?? '');
     <div class="qr"><?= $qr ?><div class="muted-sm"><?= e(__('transcripts.qr_hint')) ?></div></div>
 </div>
 
-<?= $this->partial('transcripts/_table', ['items' => $t['items'], 'showLetter' => $t['gpa'] !== null, 'tableClass' => 'doc']) ?>
+<?php
+$num = static fn ($v): string => App\Services\JournalService::normalize($v) ?? '—';
+$traditional = static function ($points): string {
+    if ($points === null) {
+        return '—';
+    }
+    $p = (float) $points;
+    $key = $p >= 3.67 ? 'excellent' : ($p >= 2.67 ? 'good' : ($p >= 1.0 ? 'satisfactory' : 'fail'));
 
-<p><strong><?= e(__('transcripts.total_hours')) ?>: <?= e($t['snapshot']['totals']['hours'] ?? 0) ?></strong>
-    <?php if ($t['gpa'] !== null): ?> · <strong>GPA: <?= e(number_format((float) $t['gpa'], 2)) ?></strong><?php if (!empty($h['gpa_basis'])): ?> <span class="muted-sm">(<?= e($h['gpa_basis']) ?>)</span><?php endif; ?><?php endif; ?></p>
+    return __('transcripts.traditional.' . $key);
+};
+$semesters = [];
+foreach ($t['items'] as $item) {
+    $semesters[str_replace('-', '–', (string) $item['academic_year']) . ' · ' . __('dashboard.semester', ['number' => $item['semester_number']])][] = $item;
+}
+$totalCredits = (float) ($t['snapshot']['totals']['credits'] ?? 0);
+$scale = (array) config('transcript.gpa.scale', []);
+?>
+<table class="rk">
+    <thead>
+    <tr>
+        <th rowspan="2" class="c"><?= e(__('transcripts.col_no')) ?></th>
+        <th rowspan="2"><?= e(__('transcripts.col_subject')) ?></th>
+        <th rowspan="2" class="c"><?= e(__('transcripts.hours')) ?></th>
+        <th rowspan="2" class="c"><?= e(__('curricula.credits')) ?></th>
+        <th colspan="4" class="c"><?= e(__('transcripts.grade')) ?></th>
+    </tr>
+    <tr>
+        <th class="c"><?= e(__('transcripts.grade_percent')) ?></th>
+        <th class="c"><?= e(__('transcripts.grade_letter')) ?></th>
+        <th class="c"><?= e(__('transcripts.grade_points')) ?></th>
+        <th class="c"><?= e(__('transcripts.grade_traditional')) ?></th>
+    </tr>
+    </thead>
+    <tbody>
+    <?php $i = 0; foreach ($semesters as $label => $list): ?>
+        <tr class="sem"><td colspan="8"><?= e($label) ?></td></tr>
+        <?php foreach ($list as $item): ?>
+            <tr>
+                <td class="c"><?= ++$i ?></td>
+                <td><?= e($item['subject_code']) ?> <?= e(localized(['name_ru' => $item['subject_name_ru'], 'name_kk' => $item['subject_name_kk']])) ?></td>
+                <td class="c"><?= e($item['hours'] ?? '—') ?><?= ($item['hours_source'] ?? null) === 'conducted' ? '*' : '' ?></td>
+                <td class="c"><?= e($item['credits'] !== null ? $num($item['credits']) : '—') ?></td>
+                <td class="c"><strong><?= e($num($item['final'])) ?></strong></td>
+                <td class="c"><?= e($item['letter'] ?? '—') ?></td>
+                <td class="c"><?= e($item['grade_points'] !== null ? number_format((float) $item['grade_points'], 2) : '—') ?></td>
+                <td class="c"><?= e($traditional($item['grade_points'])) ?></td>
+            </tr>
+        <?php endforeach; ?>
+    <?php endforeach; ?>
+    </tbody>
+    <tfoot>
+    <tr>
+        <td colspan="2"><strong><?= e(__('transcripts.total_hours')) ?> / <?= e(mb_strtolower(__('transcripts.total_credits'))) ?></strong></td>
+        <td class="c"><strong><?= e($t['snapshot']['totals']['hours'] ?? 0) ?></strong></td>
+        <td class="c"><strong><?= e($totalCredits > 0 ? $num($totalCredits) : '—') ?></strong></td>
+        <td colspan="4"></td>
+    </tr>
+    <tr>
+        <td colspan="6"><strong><?= e(__('transcripts.gpa_label')) ?></strong></td>
+        <td class="c"><strong><?= e($t['gpa'] !== null ? number_format((float) $t['gpa'], 2) : '—') ?></strong></td>
+        <td></td>
+    </tr>
+    </tfoot>
+</table>
 <p class="muted-sm"><?= e(__('transcripts.hours_note')) ?></p>
+
+<?php if ($scale !== []): ?>
+    <div class="scale">
+        <div class="scale-title"><?= e(__('transcripts.scale_title')) ?><?php if (!empty($h['gpa_basis'])): ?> (<?= e(__('transcripts.basis')) ?>: <?= e($h['gpa_basis']) ?>)<?php endif; ?></div>
+        <table class="rk scale-table">
+            <tr><th><?= e(__('transcripts.grade_letter')) ?></th><?php foreach ($scale as [, $letter]): ?><td class="c"><?= e($letter) ?></td><?php endforeach; ?></tr>
+            <tr><th><?= e(__('transcripts.grade_points')) ?></th><?php foreach ($scale as [, , $points]): ?><td class="c"><?= e(number_format((float) $points, 2)) ?></td><?php endforeach; ?></tr>
+            <tr><th><?= e(__('transcripts.scale_range')) ?></th><?php $prev = 100; foreach ($scale as [$min]): ?><td class="c"><?= e($min . '–' . $prev) ?></td><?php $prev = $min - 1; endforeach; ?></tr>
+            <tr><th><?= e(__('transcripts.grade_traditional')) ?></th><?php
+                $spans = [];
+                foreach ($scale as [, , $points]) {
+                    $label = $traditional($points);
+                    $last = array_key_last($spans);
+                    if ($last !== null && $spans[$last][0] === $label) {
+                        $spans[$last][1]++;
+                    } else {
+                        $spans[] = [$label, 1];
+                    }
+                }
+                foreach ($spans as [$label, $span]): ?><td class="c sm" colspan="<?= $span ?>"><?= e($label) ?></td><?php endforeach; ?></tr>
+        </table>
+    </div>
+<?php endif; ?>
 
 <?php if (!empty($h['history'])): ?>
     <h2><?= e(__('transcripts.history')) ?></h2>
@@ -47,7 +131,11 @@ $college = $kk ? ($h['college_kk'] ?? '') : ($h['college_ru'] ?? '');
     </table>
 <?php endif; ?>
 
-<p style="margin-top: 12mm"><?= e(__('transcripts.signature')) ?> ____________________ &nbsp;&nbsp; <?= e(__('transcripts.stamp')) ?></p>
+<div class="signs">
+    <div><?= e(__('transcripts.sign_head')) ?></div><div class="line"></div>
+    <div><?= e(__('transcripts.sign_deputy')) ?></div><div class="line"></div>
+    <div><?= e(__('transcripts.stamp')) ?></div><div></div>
+</div>
 <footer class="doc-footer">
     <?= e(__('transcripts.fingerprint')) ?>: <?= e(strtoupper(substr((string) $t['fingerprint'], 0, 16))) ?> · <?= e(__('transcripts.verify_at')) ?> <?= e($verifyUrl) ?>
 </footer>

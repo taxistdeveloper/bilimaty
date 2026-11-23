@@ -229,6 +229,14 @@ final class TranscriptService
     /** @param list<array<string, mixed>> $items */
     private function gpa(array $items, string $weightBy, int $decimals): ?float
     {
+        if ($weightBy === 'credits') {
+            foreach ($items as $item) {
+                if ($item['grade_points'] !== null && (float) $item['credits'] <= 0) {
+                    $weightBy = 'hours'; // no credits in the plan: weigh every subject by hours instead
+                    break;
+                }
+            }
+        }
         $sum = 0.0;
         $weights = 0.0;
         foreach ($items as $item) {
